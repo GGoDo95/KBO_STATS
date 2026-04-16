@@ -230,25 +230,31 @@ TEAMS.forEach(t=>{{ const o=document.createElement('option'); o.value=t; o.textC
 
 // ── 탭 ─────────────────────────────────────────────────
 
+function showTab(tab) {{
+  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.remove('active'));
+  const btn = document.querySelector('[data-tab="'+tab+'"]');
+  if (btn) btn.classList.add('active');
+  ['bat','pit','team'].forEach(t=>document.getElementById('tab-'+t).style.display = t===tab?'':'none');
+  document.getElementById('paFilterWrap').style.display = tab==='bat' ? '' : 'none';
+  document.getElementById('ipFilterWrap').style.display = tab==='pit' ? '' : 'none';
+  localStorage.setItem('kbo_tab', tab);
+  setTimeout(()=>{{
+    if (tab==='bat'  && batDT)  batDT.columns.adjust().draw(false);
+    if (tab==='pit'  && pitDT)  pitDT.columns.adjust().draw(false);
+    if (tab==='team') {{
+      renderTeamCharts(_lastBat, _lastPit);
+      setTimeout(()=>{{
+        Plotly.Plots.resize(document.getElementById('chart-twar'));
+        Plotly.Plots.resize(document.getElementById('chart-tsc'));
+      }}, 150);
+      if (teamDT) teamDT.columns.adjust().draw(false);
+    }}
+    document.querySelectorAll('#tab-'+tab+' [id^=chart]').forEach(el=>Plotly.Plots.resize(el));
+  }}, 100);
+}}
+
 document.querySelectorAll('[data-tab]').forEach(btn=>{{
-  btn.addEventListener('click', ()=>{{
-    document.querySelectorAll('[data-tab]').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    ['bat','pit','team'].forEach(t=>document.getElementById('tab-'+t).style.display = t===tab?'':'none');
-    document.getElementById('paFilterWrap').style.display = tab==='bat' ? '' : 'none';
-    document.getElementById('ipFilterWrap').style.display = tab==='pit' ? '' : 'none';
-    // 탭 전환 후 컬럼 정렬 보정 + 차트 렌더/리사이즈
-    setTimeout(()=>{{
-      if (tab==='bat'  && batDT)  batDT.columns.adjust().draw(false);
-      if (tab==='pit'  && pitDT)  pitDT.columns.adjust().draw(false);
-      if (tab==='team') {{
-        renderTeamCharts(_lastBat, _lastPit);
-        if (teamDT) teamDT.columns.adjust().draw(false);
-      }}
-      document.querySelectorAll('#tab-'+tab+' [id^=chart]').forEach(el=>Plotly.Plots.resize(el));
-    }}, 50);
-  }});
+  btn.addEventListener('click', ()=>showTab(btn.dataset.tab));
 }});
 
 // ── 필터 ────────────────────────────────────────────────
@@ -625,6 +631,12 @@ document.getElementById('ipFilter').addEventListener('input', function(){{
   }}
 }})();
 applyFilters();
+
+// 마지막 탭 복원
+(()=>{{
+  const saved = localStorage.getItem('kbo_tab');
+  if (saved && ['bat','pit','team'].includes(saved)) showTab(saved);
+}})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {{
