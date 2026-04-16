@@ -152,6 +152,7 @@ const BASE_LAY = {
 
 const seasonSel = document.getElementById('seasonFilter');
 SEASONS.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; seasonSel.appendChild(o); });
+seasonSel.value = SEASONS[SEASONS.length-1];  // 최신 연도 기본 선택
 const teamSel = document.getElementById('teamFilter');
 TEAMS.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; teamSel.appendChild(o); });
 
@@ -491,7 +492,16 @@ document.getElementById('ipFilter').addEventListener('input', function(){
   document.getElementById('ipVal').textContent=this.value; applyFilters();
 });
 
-// 최초 렌더
+// 최초 렌더 — 최신 연도에 맞게 PA/IP 초기값 조정
+(()=>{
+  const s = seasonSel.value;
+  const pa = document.getElementById('paFilter');
+  const ip = document.getElementById('ipFilter');
+  if (s==='2026') {
+    pa.value=0; document.getElementById('paVal').textContent=0;
+    ip.value=0; document.getElementById('ipVal').textContent=0;
+  }
+})();
 applyFilters();
 </script>
 <script>
