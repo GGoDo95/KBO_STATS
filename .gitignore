@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Database (ephemeral — CSVs are the source of truth)
+data/*.db
+
+# Sensitive
+스탯티즈 로그인정보.txt
+.env
+*.key
+
+# OS
+.DS_Store
+Thumbs.db

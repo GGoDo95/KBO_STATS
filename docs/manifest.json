@@ -1,0 +1,15 @@
+{
+  "name": "KBO 세이버매트릭스",
+  "short_name": "KBO Stats",
+  "description": "KBO 2025 세이버매트릭스 분석 대시보드",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#003580",
+  "theme_color": "#003580",
+  "orientation": "any",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
