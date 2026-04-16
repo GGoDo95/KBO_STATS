@@ -368,8 +368,11 @@ function filterData(data, season, team, minPA, minIP) {{
 let batDT, pitDT, teamDT;
 
 function initBat(data) {{
-  const cols = makeColumns(data);
-  if (batDT) {{ batDT.destroy(); $('#batTable').empty(); }}
+  if (batDT) {{
+    batDT.clear().rows.add(data).draw();
+    return;
+  }}
+  const cols = makeColumns(BAT_DATA);
   batDT = $('#batTable').DataTable({{
     data, columns: cols,
     pageLength: 25, order: [[cols.findIndex(c=>c.data==='wRC+'), 'desc']],
@@ -379,8 +382,11 @@ function initBat(data) {{
 }}
 
 function initPit(data) {{
-  const cols = makeColumns(data);
-  if (pitDT) {{ pitDT.destroy(); $('#pitTable').empty(); }}
+  if (pitDT) {{
+    pitDT.clear().rows.add(data).draw();
+    return;
+  }}
+  const cols = makeColumns(PIT_DATA);
   pitDT = $('#pitTable').DataTable({{
     data, columns: cols,
     pageLength: 25, order: [[cols.findIndex(c=>c.data==='pWAR'), 'desc']],
@@ -390,8 +396,11 @@ function initPit(data) {{
 }}
 
 function initTeam(data) {{
+  if (teamDT) {{
+    teamDT.clear().rows.add(data).draw();
+    return;
+  }}
   const cols = makeColumns(data);
-  if (teamDT) {{ teamDT.destroy(); $('#teamTable').empty(); }}
   teamDT = $('#teamTable').DataTable({{
     data, columns: cols,
     pageLength: 15, order: [[cols.findIndex(c=>c.data==='총WAR'), 'desc']],
@@ -401,9 +410,8 @@ function initTeam(data) {{
   }});
 }}
 
-// 최초 렌더
-initBat(BAT_DATA);
-initPit(PIT_DATA);
+// 최초 렌더 (기본값 필터 적용)
+applyFilters();
 initTeam(TEAM_DATA);
 
 // 필터 이벤트
@@ -416,7 +424,20 @@ function applyFilters() {{
   initPit(filterData(PIT_DATA, season, team, 0, minIP));
 }}
 
-seasonSel.addEventListener('change', applyFilters);
+seasonSel.addEventListener('change', () => {{
+  // 2026은 시즌 초반 — PA/IP 기본값 자동 조정
+  const s = seasonSel.value;
+  const paSlider = document.getElementById('paFilter');
+  const ipSlider = document.getElementById('ipFilter');
+  if (s === '2026') {{
+    paSlider.value = 0; document.getElementById('paVal').textContent = 0;
+    ipSlider.value = 0; document.getElementById('ipVal').textContent = 0;
+  }} else if (s !== '전체') {{
+    paSlider.value = 450; document.getElementById('paVal').textContent = 450;
+    ipSlider.value = 144; document.getElementById('ipVal').textContent = 144;
+  }}
+  applyFilters();
+}});
 sel.addEventListener('change', applyFilters);
 document.getElementById('paFilter').addEventListener('input', function() {{
   document.getElementById('paVal').textContent = this.value; applyFilters();

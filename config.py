@@ -1,6 +1,6 @@
 SEASON = 2025
 TEAM = ""  # 빈 문자열 = 전체 팀
-SEASONS = [2023, 2024, 2025]  # 수집 대상 시즌
+SEASONS = [2023, 2024, 2025, 2026]  # 수집 대상 시즌
 
 # 요청 헤더
 HEADERS = {
@@ -38,6 +38,16 @@ SEASON_CONFIGS = {
         "LEAGUE_SLG": 0.408,
     },
     2025: {
+        "LINEAR_WEIGHTS": {"BB": 0.690, "HBP": 0.720, "1B": 0.880, "2B": 1.247, "3B": 1.578, "HR": 2.031},
+        "WOBA_SCALE": 1.157,
+        "LEAGUE_WOBA": 0.320,
+        "LEAGUE_RUNS_PER_PA": 0.118,
+        "FIP_CONSTANT": 3.10,
+        "LEAGUE_ERA": 4.20,
+        "LEAGUE_OBP": 0.330,
+        "LEAGUE_SLG": 0.410,
+    },
+    2026: {  # 시즌 진행 중 — 종료 후 실제 리그 평균으로 보정 필요
         "LINEAR_WEIGHTS": {"BB": 0.690, "HBP": 0.720, "1B": 0.880, "2B": 1.247, "3B": 1.578, "HR": 2.031},
         "WOBA_SCALE": 1.157,
         "LEAGUE_WOBA": 0.320,
