@@ -1,5 +1,5 @@
 """
-Streamlit 대시보드 - KBO 2025 세이버매트릭스 분석
+Streamlit 대시보드 - KBO STATS
 실행: streamlit run web/app.py
 """
 
@@ -13,8 +13,8 @@ import plotly.express as px
 from database import db
 from main import run
 
-st.set_page_config(page_title="KBO 세이버매트릭스", page_icon="⚾", layout="wide")
-st.title("⚾ KBO 2025 세이버매트릭스 분석")
+st.set_page_config(page_title="KBO STATS", page_icon="⚾", layout="wide")
+st.title("⚾ KBO STATS")
 
 # 데이터 최신화 날짜 표시
 data_dir = Path(__file__).parent.parent / "data"
@@ -121,17 +121,21 @@ with tab1:
         min_pa = st.slider("최소 PA", 0, pa_max_val, 450, step=10,
                            help=f"규정타석=450 | 현재 데이터 PA 범위: 0~{pa_max_val}")
 
-    bat_show_cols = ["선수명", "팀", "PA", "AVG", "OBP", "SLG", "OPS", "wOBA", "wRC+", "ISO", "BABIP", "OPS+", "bWAR"]
-    bat_show = [c for c in bat_show_cols if c in bat_df.columns]
+    BAT_CLASSIC = ["선수명", "팀", "G", "PA", "AVG", "HR", "RBI", "R", "BB", "SO", "OBP", "SLG", "OPS"]
+    BAT_SABER   = ["BABIP", "ISO", "wOBA", "wRC+", "OPS+", "bWAR"]
+
     filtered = bat_df[bat_df["PA"] >= min_pa].sort_values(sort_by, ascending=False).reset_index(drop=True)
     filtered.index += 1
 
-    st.dataframe(
-        filtered[bat_show].style
-            .background_gradient(subset=["wRC+", "bWAR"], cmap="RdYlGn")
-            .highlight_null(color="#e0e0e0"),
-        use_container_width=True,
-    )
+    show_saber = st.toggle("세이버 지표 보기", value=False, key="bat_saber_toggle")
+    show_cols = BAT_CLASSIC + (BAT_SABER if show_saber else [])
+    bat_show = [c for c in show_cols if c in bat_df.columns]
+
+    gradient_cols = [c for c in ["wRC+", "bWAR"] if c in bat_show]
+    styler = filtered[bat_show].style.highlight_null(color="#e0e0e0")
+    if gradient_cols:
+        styler = styler.background_gradient(subset=gradient_cols, cmap="RdYlGn")
+    st.dataframe(styler, use_container_width=True)
 
     c_a, c_b = st.columns(2)
     with c_a:
@@ -177,19 +181,22 @@ with tab2:
         min_ip = st.slider("최소 IP", 0, ip_max_val, 144, step=1,
                            help=f"규정이닝=144 | 현재 데이터 IP 범위: 0~{ip_max_val}")
 
-    pit_show_cols = ["선수명", "팀", "IP", "ERA", "FIP", "xFIP", "ERA+", "WHIP", "K/9", "BB/9", "K/BB", "pWAR"]
-    pit_show = [c for c in pit_show_cols if c in pit_df.columns]
+    PIT_CLASSIC = ["선수명", "팀", "G", "W", "L", "SV", "HLD", "IP", "ERA", "WHIP", "SO", "BB", "HR"]
+    PIT_SABER   = ["FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "pWAR"]
 
-    asc = pit_sort in ["FIP", "xFIP", "WHIP"]
+    asc = pit_sort in ["FIP", "xFIP", "WHIP", "ERA"]
     pit_filtered = pit_df[pit_df["IP_float"] >= min_ip].sort_values(pit_sort, ascending=asc).reset_index(drop=True)
     pit_filtered.index += 1
 
-    st.dataframe(
-        pit_filtered[pit_show].style
-            .background_gradient(subset=["ERA+", "pWAR"], cmap="RdYlGn")
-            .highlight_null(color="#e0e0e0"),
-        use_container_width=True,
-    )
+    show_saber = st.toggle("세이버 지표 보기", value=False, key="pit_saber_toggle")
+    show_cols = PIT_CLASSIC + (PIT_SABER if show_saber else [])
+    pit_show = [c for c in show_cols if c in pit_df.columns]
+
+    gradient_cols = [c for c in ["ERA+", "pWAR"] if c in pit_show]
+    styler = pit_filtered[pit_show].style.highlight_null(color="#e0e0e0")
+    if gradient_cols:
+        styler = styler.background_gradient(subset=gradient_cols, cmap="RdYlGn")
+    st.dataframe(styler, use_container_width=True)
 
     c_a, c_b = st.columns(2)
     with c_a:

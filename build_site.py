@@ -36,10 +36,15 @@ TEAM_COLORS = {
 
 # ── JSON 데이터 ────────────────────────────────────────────
 
-BAT_COLS = ["시즌", "선수명", "팀", "PA", "AVG", "OBP", "SLG", "OPS",
-            "wOBA", "wRC+", "ISO", "BABIP", "OPS+", "bWAR"]
-PIT_COLS = ["시즌", "선수명", "팀", "IP", "IP_float", "ERA", "FIP", "xFIP",
-            "ERA+", "WHIP", "K/9", "BB/9", "K/BB", "pWAR"]
+BAT_COLS = ["시즌", "선수명", "팀", "G", "PA", "AVG", "HR", "RBI", "R",
+            "BB", "SO", "OBP", "SLG", "OPS",
+            "BABIP", "ISO", "wOBA", "wRC+", "OPS+", "bWAR"]
+PIT_COLS = ["시즌", "선수명", "팀", "G", "W", "L", "SV", "HLD",
+            "IP", "IP_float", "ERA", "WHIP", "SO", "BB", "HR",
+            "FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "pWAR"]
+
+BAT_SABER = ["BABIP", "ISO", "wOBA", "wRC+", "OPS+", "bWAR"]
+PIT_SABER = ["FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "pWAR"]
 
 bat_cols = [c for c in BAT_COLS if c in bat.columns]
 pit_cols = [c for c in PIT_COLS if c in pit.columns]
@@ -56,7 +61,7 @@ html = f"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>KBO 세이버매트릭스</title>
+<title>KBO STATS</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -99,7 +104,7 @@ html = f"""<!DOCTYPE html>
 <div class="container-fluid py-3 px-4">
 
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>⚾ KBO 세이버매트릭스 분석</h1>
+    <h1>⚾ KBO STATS</h1>
     <small class="text-muted">koreabaseball.com &nbsp;|&nbsp; 업데이트: {updated}</small>
   </div>
 
@@ -138,6 +143,12 @@ html = f"""<!DOCTYPE html>
 
   <!-- 타자 탭 -->
   <div id="tab-bat">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <button id="batSaberBtn" class="btn btn-sm btn-outline-primary" onclick="toggleBatSaber()">
+        세이버 지표 보기 ▼
+      </button>
+      <small class="text-muted">기본: 클래식 스탯 | 버튼 클릭 시 BABIP·wOBA·wRC+·bWAR 등 추가</small>
+    </div>
     <div class="table-responsive mb-2">
       <table id="batTable" class="table table-sm table-hover table-bordered w-100"></table>
     </div>
@@ -150,6 +161,12 @@ html = f"""<!DOCTYPE html>
 
   <!-- 투수 탭 -->
   <div id="tab-pit" style="display:none">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <button id="pitSaberBtn" class="btn btn-sm btn-outline-primary" onclick="togglePitSaber()">
+        세이버 지표 보기 ▼
+      </button>
+      <small class="text-muted">기본: 클래식 스탯 | 버튼 클릭 시 FIP·xFIP·ERA+·K/9 등 추가</small>
+    </div>
     <div class="table-responsive mb-2">
       <table id="pitTable" class="table table-sm table-hover table-bordered w-100"></table>
     </div>
@@ -182,6 +199,8 @@ const PIT_DATA  = {pit_json};
 const TEAMS     = {teams_json};
 const SEASONS   = {seasons_json};
 const TC        = {json.dumps(TEAM_COLORS, ensure_ascii=False)};
+const BAT_SABER = {json.dumps(BAT_SABER, ensure_ascii=False)};
+const PIT_SABER = {json.dumps(PIT_SABER, ensure_ascii=False)};
 
 // ── 공통 ────────────────────────────────────────────────
 
@@ -262,26 +281,62 @@ function makeCols(data, hide=[]) {{
 
 let batDT, pitDT, teamDT;
 
+const BAT_KEYS = () => Object.keys(BAT_DATA[0]);
+const PIT_KEYS = () => Object.keys(PIT_DATA[0]);
+
 function initBat(data) {{
-  if (batDT) {{ batDT.clear().rows.add(data).draw(); return; }}
+  if (batDT) {{ batDT.clear().rows.add(data).columns.adjust().draw(false); return; }}
+  const hideCols = ['IP_float', ...BAT_SABER];
   batDT = $('#batTable').DataTable({{
-    data, columns: makeCols(BAT_DATA),
+    data, columns: makeCols(BAT_DATA, hideCols),
     pageLength:25,
-    order:[[Object.keys(BAT_DATA[0]).indexOf('wRC+'),'desc']],
+    order:[[BAT_KEYS().indexOf('AVG'),'desc']],
     language:{{search:'검색:',lengthMenu:'_MENU_개씩',info:'_TOTAL_명',paginate:{{next:'▶',previous:'◀'}}}},
     scrollX:true,
   }});
 }}
 
 function initPit(data) {{
-  if (pitDT) {{ pitDT.clear().rows.add(data).draw(); return; }}
+  if (pitDT) {{ pitDT.clear().rows.add(data).columns.adjust().draw(false); return; }}
+  const hideCols = ['IP_float', ...PIT_SABER];
   pitDT = $('#pitTable').DataTable({{
-    data, columns: makeCols(PIT_DATA, ['IP_float']),
+    data, columns: makeCols(PIT_DATA, hideCols),
     pageLength:25,
-    order:[[Object.keys(PIT_DATA[0]).indexOf('pWAR'),'desc']],
+    order:[[PIT_KEYS().indexOf('ERA'),'asc']],
     language:{{search:'검색:',lengthMenu:'_MENU_개씩',info:'_TOTAL_명',paginate:{{next:'▶',previous:'◀'}}}},
     scrollX:true,
   }});
+}}
+
+// ── 세이버 토글 ──────────────────────────────────────────
+
+let batSaberOn = false;
+let pitSaberOn = false;
+
+function toggleBatSaber() {{
+  batSaberOn = !batSaberOn;
+  const keys = BAT_KEYS();
+  BAT_SABER.forEach(col=>{{
+    const idx = keys.indexOf(col);
+    if (idx>=0 && batDT) batDT.column(idx).visible(batSaberOn);
+  }});
+  if (batDT) batDT.columns.adjust().draw(false);
+  const btn = document.getElementById('batSaberBtn');
+  btn.textContent = batSaberOn ? '세이버 지표 숨기기 ▲' : '세이버 지표 보기 ▼';
+  btn.className = batSaberOn ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
+}}
+
+function togglePitSaber() {{
+  pitSaberOn = !pitSaberOn;
+  const keys = PIT_KEYS();
+  PIT_SABER.forEach(col=>{{
+    const idx = keys.indexOf(col);
+    if (idx>=0 && pitDT) pitDT.column(idx).visible(pitSaberOn);
+  }});
+  if (pitDT) pitDT.columns.adjust().draw(false);
+  const btn = document.getElementById('pitSaberBtn');
+  btn.textContent = pitSaberOn ? '세이버 지표 숨기기 ▲' : '세이버 지표 보기 ▼';
+  btn.className = pitSaberOn ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-primary';
 }}
 
 function initTeam(data) {{
