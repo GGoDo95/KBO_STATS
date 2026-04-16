@@ -15,8 +15,8 @@ from config import HEADERS, CRAWL_DELAY, SEASON
 BASE = "https://www.koreabaseball.com"
 
 KBO_TEAM_CODES = {
-    "LG": "LG", "KT": "KT", "SSG": "SS", "NC": "NC",
-    "두산": "OB", "KIA": "HT", "롯데": "LT", "삼성": "SK",
+    "LG": "LG", "KT": "KT", "SSG": "SK", "NC": "NC",
+    "두산": "OB", "KIA": "HT", "롯데": "LT", "삼성": "SS",
     "한화": "HH", "키움": "WO",
 }
 
