@@ -118,8 +118,8 @@ with tab1:
         sort_by = st.selectbox("정렬 기준", ["wRC+", "bWAR", "wOBA", "OPS+", "ISO", "BABIP"], key="bat_sort")
     with c2:
         pa_max_val = int(bat_df["PA"].max()) if len(bat_df) else 700
-        min_pa = st.slider("최소 PA", 0, pa_max_val, 0, step=10,
-                           help=f"현재 데이터 PA 범위: 0~{pa_max_val}")
+        min_pa = st.slider("최소 PA", 0, pa_max_val, 450, step=10,
+                           help=f"규정타석=450 | 현재 데이터 PA 범위: 0~{pa_max_val}")
 
     bat_show_cols = ["선수명", "팀", "PA", "AVG", "OBP", "SLG", "OPS", "wOBA", "wRC+", "ISO", "BABIP", "OPS+", "bWAR"]
     bat_show = [c for c in bat_show_cols if c in bat_df.columns]
@@ -174,8 +174,8 @@ with tab2:
             key="pit_sort")
     with c2:
         ip_max_val = int(pit_df["IP_float"].max()) if len(pit_df) else 200
-        min_ip = st.slider("최소 IP", 0, ip_max_val, 0, step=5,
-                           help=f"현재 데이터 IP 범위: 0~{ip_max_val}")
+        min_ip = st.slider("최소 IP", 0, ip_max_val, 144, step=1,
+                           help=f"규정이닝=144 | 현재 데이터 IP 범위: 0~{ip_max_val}")
 
     pit_show_cols = ["선수명", "팀", "IP", "ERA", "FIP", "xFIP", "ERA+", "WHIP", "K/9", "BB/9", "K/BB", "pWAR"]
     pit_show = [c for c in pit_show_cols if c in pit_df.columns]

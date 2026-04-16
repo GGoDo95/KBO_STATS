@@ -227,12 +227,12 @@ html = f"""<!DOCTYPE html>
       </select>
     </div>
     <div id="paFilterWrap">
-      <label class="form-label fw-semibold mb-1">최소 PA: <span id="paVal">0</span></label>
-      <input type="range" class="form-range" id="paFilter" min="0" max="700" step="10" value="0" style="width:160px">
+      <label class="form-label fw-semibold mb-1">최소 PA: <span id="paVal">450</span> <small class="text-muted">(규정타석 450)</small></label>
+      <input type="range" class="form-range" id="paFilter" min="0" max="700" step="10" value="450" style="width:160px">
     </div>
     <div id="ipFilterWrap" style="display:none">
-      <label class="form-label fw-semibold mb-1">최소 IP: <span id="ipVal">0</span></label>
-      <input type="range" class="form-range" id="ipFilter" min="0" max="200" step="5" value="0" style="width:160px">
+      <label class="form-label fw-semibold mb-1">최소 IP: <span id="ipVal">144</span> <small class="text-muted">(규정이닝 144)</small></label>
+      <input type="range" class="form-range" id="ipFilter" min="0" max="200" step="1" value="144" style="width:160px">
     </div>
   </div>
 
