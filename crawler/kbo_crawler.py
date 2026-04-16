@@ -82,6 +82,36 @@ def _parse_table(soup):
     return pd.DataFrame(data, columns=headers[:len(data[0])])
 
 
+def _parse_table_with_ids(soup):
+    """테이블 파싱 + 선수명 링크에서 playerId 추출. (df, {이름: id}) 반환."""
+    import re
+    table = soup.find("table", {"class": "tData01"})
+    if not table:
+        return pd.DataFrame(), {}
+    rows = table.find_all("tr")
+    if len(rows) < 2:
+        return pd.DataFrame(), {}
+    headers = [th.get_text(strip=True) for th in rows[0].find_all("th")]
+    data, player_ids = [], {}
+    for tr in rows[1:]:
+        tds = tr.find_all("td")
+        cells = [td.get_text(strip=True) for td in tds]
+        if not cells:
+            continue
+        data.append(cells)
+        for td in tds:
+            a = td.find("a", href=True)
+            if a and "playerId=" in (a.get("href") or ""):
+                m = re.search(r"playerId=(\d+)", a["href"])
+                name = td.get_text(strip=True)
+                if m and name:
+                    player_ids[name] = int(m.group(1))
+                break
+    if not data:
+        return pd.DataFrame(), player_ids
+    return pd.DataFrame(data, columns=headers[:len(data[0])]), player_ids
+
+
 def _init_filters(session, url, team_code, season):
     """GET → 시즌 POST → (팀 POST) 초기화. 마지막 soup 반환."""
     soup = _get_soup(session, url)
@@ -137,6 +167,88 @@ def _fetch_all_pages(session, url, team_code, season):
     return pd.concat(all_frames, ignore_index=True) if all_frames else pd.DataFrame()
 
 
+def _fetch_all_pages_with_ids(session, url, team_code, season):
+    """모든 페이지 데이터 + player_id dict 수집."""
+    soup, SN, SerN, TN, PN = _init_filters(session, url, team_code, season)
+
+    df0, ids0 = _parse_table_with_ids(soup)
+    all_frames = [df0]
+    all_ids = dict(ids0)
+    page = 2
+
+    while True:
+        target = _next_page_target(soup, page)
+        if not target:
+            break
+        soup = _post(session, url, soup, target, {
+            SN: str(season), SerN: "0", TN: team_code, PN: "",
+        })
+        df_page, ids_page = _parse_table_with_ids(soup)
+        if df_page.empty:
+            break
+        all_frames.append(df_page)
+        all_ids.update(ids_page)
+        page += 1
+
+    combined = pd.concat(all_frames, ignore_index=True) if all_frames else pd.DataFrame()
+    return combined, all_ids
+
+
+def crawl_player_profile(player_id: int, kind: str = "hitter") -> dict:
+    """선수 기본 프로필(신상정보) 크롤링."""
+    kind_path = "Hitter" if kind == "hitter" else "Pitcher"
+    url = f"{BASE}/Record/Player/{kind_path}Detail/Basic.aspx?playerId={player_id}"
+    session = requests.Session()
+    try:
+        soup = _get_soup(session, url)
+    except Exception as e:
+        print(f"  [프로필 오류] playerId={player_id}: {e}")
+        return {}
+
+    basic = soup.find("div", {"class": "player_basic"})
+    if not basic:
+        return {}
+
+    info: dict = {}
+    for li in basic.find_all("li"):
+        text = li.get_text(strip=True)
+        if ":" in text:
+            key, _, val = text.partition(":")
+            info[key.strip()] = val.strip()
+
+    # 선수 사진 URL
+    player_info_div = soup.find("div", {"class": "player_info"})
+    if player_info_div:
+        img = player_info_div.find("img", src=lambda s: s and "person" in (s or ""))
+        if img and img.get("src"):
+            src = img["src"]
+            info["사진"] = ("https:" + src) if src.startswith("//") else src
+
+    info["player_id"] = player_id
+    info["kind"] = kind
+    return info
+
+
+def crawl_all_profiles(player_id_map: dict, existing_ids: set = None) -> list:
+    """
+    player_id_map: {선수명: (player_id, kind)} 형태
+    existing_ids : 이미 DB에 있는 player_id 집합 (스킵)
+    """
+    existing_ids = existing_ids or set()
+    profiles = []
+    new_ids = {name: v for name, v in player_id_map.items() if v[0] not in existing_ids}
+    print(f"[프로필] 신규 수집 대상: {len(new_ids)}명 (기존: {len(existing_ids)}명)")
+    for i, (name, (pid, kind)) in enumerate(new_ids.items(), 1):
+        print(f"  [{i}/{len(new_ids)}] {name} (id={pid})", end="", flush=True)
+        p = crawl_player_profile(pid, kind)
+        if p:
+            profiles.append(p)
+            print(" ✓")
+        else:
+            print(" ✗")
+    return profiles
+
+
 def _to_numeric(df, exclude):
     for col in df.columns:
         if col not in exclude:
@@ -150,7 +262,7 @@ def _to_numeric(df, exclude):
 
 # ── 공개 API ──────────────────────────────────────────────
 
-def crawl_batting(team: str = "LG", season: int = SEASON) -> pd.DataFrame:
+def crawl_batting(team: str = "LG", season: int = SEASON, return_ids: bool = False):
     """
     KBO 타자 스탯 수집.
     Basic1: 순위, 선수명, 팀, AVG, G, PA, AB, R, H, 2B, 3B, HR, TB, RBI, SAC, SF
@@ -163,8 +275,13 @@ def crawl_batting(team: str = "LG", season: int = SEASON) -> pd.DataFrame:
     url1 = f"{BASE}/Record/Player/HitterBasic/Basic1.aspx"
     url2 = f"{BASE}/Record/Player/HitterBasic/Basic2.aspx"
 
-    df1 = _fetch_all_pages(session, url1, team_code, season)
-    df2 = _fetch_all_pages(session, url2, team_code, season)
+    if return_ids:
+        df1, ids1 = _fetch_all_pages_with_ids(session, url1, team_code, season)
+        df2 = _fetch_all_pages(session, url2, team_code, season)
+    else:
+        df1 = _fetch_all_pages(session, url1, team_code, season)
+        df2 = _fetch_all_pages(session, url2, team_code, season)
+        ids1 = {}
 
     if df1.empty:
         raise ValueError(f"{season}시즌 {team} 타자 데이터 수집 실패")
@@ -203,10 +320,12 @@ def crawl_batting(team: str = "LG", season: int = SEASON) -> pd.DataFrame:
 
     df = df.drop(columns=["순위", "MH", "RISP", "PH-BA"], errors="ignore")
     print(f"  → {len(df)}명 타자 수집 완료")
+    if return_ids:
+        return df, ids1
     return df
 
 
-def crawl_pitching(team: str = "LG", season: int = SEASON) -> pd.DataFrame:
+def crawl_pitching(team: str = "LG", season: int = SEASON, return_ids: bool = False):
     """
     KBO 투수 스탯 수집.
     Basic1: 순위, 선수명, 팀, ERA, G, W, L, SV, HLD, IP, R, ER, BB, HBP, SO, HR
@@ -219,8 +338,13 @@ def crawl_pitching(team: str = "LG", season: int = SEASON) -> pd.DataFrame:
     url1 = f"{BASE}/Record/Player/PitcherBasic/Basic1.aspx"
     url2 = f"{BASE}/Record/Player/PitcherBasic/Basic2.aspx"
 
-    df1 = _fetch_all_pages(session, url1, team_code, season)
-    df2 = _fetch_all_pages(session, url2, team_code, season)
+    if return_ids:
+        df1, ids1 = _fetch_all_pages_with_ids(session, url1, team_code, season)
+        df2 = _fetch_all_pages(session, url2, team_code, season)
+    else:
+        df1 = _fetch_all_pages(session, url1, team_code, season)
+        df2 = _fetch_all_pages(session, url2, team_code, season)
+        ids1 = {}
 
     if df1.empty:
         raise ValueError(f"{season}시즌 {team} 투수 데이터 수집 실패")
@@ -265,4 +389,6 @@ def crawl_pitching(team: str = "LG", season: int = SEASON) -> pd.DataFrame:
         df = df[ip_float >= 0.1].reset_index(drop=True)
 
     print(f"  → {len(df)}명 투수 수집 완료")
+    if return_ids:
+        return df, ids1
     return df

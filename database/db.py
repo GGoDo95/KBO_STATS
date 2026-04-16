@@ -61,3 +61,47 @@ def season_exists(table: str, season: int) -> bool:
     with _get_conn() as conn:
         cur = conn.execute(f"SELECT 1 FROM {table} WHERE 시즌 = ? LIMIT 1", (season,))
         return cur.fetchone() is not None
+
+
+# ── 선수 프로필 ──────────────────────────────────────────
+
+def save_profiles(profiles: list) -> None:
+    import json
+    with _get_conn() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS profiles (
+                player_id INTEGER PRIMARY KEY,
+                선수명 TEXT,
+                data TEXT
+            )
+        """)
+        for p in profiles:
+            if not p or "player_id" not in p:
+                continue
+            conn.execute(
+                "INSERT OR REPLACE INTO profiles (player_id, 선수명, data) VALUES (?,?,?)",
+                (p["player_id"], p.get("선수명", ""), json.dumps(p, ensure_ascii=False)),
+            )
+        conn.commit()
+    print(f"[DB] 선수 프로필 {len(profiles)}명 저장 → {DB_PATH}")
+
+
+def load_profiles() -> dict:
+    """선수명을 키로 하는 프로필 dict 반환. DB 없으면 빈 dict."""
+    import json
+    if not table_exists("profiles"):
+        return {}
+    try:
+        with _get_conn() as conn:
+            rows = conn.execute("SELECT 선수명, data FROM profiles").fetchall()
+            return {name: json.loads(data) for name, data in rows if name}
+    except Exception:
+        return {}
+
+
+def get_existing_profile_ids() -> set:
+    if not table_exists("profiles"):
+        return set()
+    with _get_conn() as conn:
+        rows = conn.execute("SELECT player_id FROM profiles").fetchall()
+        return {r[0] for r in rows}
