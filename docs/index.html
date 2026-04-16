@@ -44,7 +44,7 @@
   .player-link:hover { color:#0056d6; }
   /* 선수 상세 페이지 */
   #playerPage {
-    display:none; animation:pageIn .2s ease;
+    animation:pageIn .2s ease;
   }
   @keyframes pageIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
   .page-back {
@@ -103,7 +103,7 @@
 <div class="container-fluid py-3 px-4">
 
 <!-- 선수 상세 페이지 -->
-<div id="playerPage">
+<div id="playerPage" style="display:none">
   <button class="page-back" onclick="closePage()">&#8592; 목록으로</button>
   <div class="player-card">
     <div class="player-card-hero">
@@ -304,14 +304,16 @@ function openPage(name) {
     statsEl.innerHTML = '<p class="text-muted small">스탯 데이터 없음</p>';
   }
 
-  document.getElementById('playerPage').style.display = '';
+  document.getElementById('playerPage').style.display = 'block';
   document.getElementById('mainContent').style.display = 'none';
+  localStorage.setItem('kbo_player', name);
   window.scrollTo(0,0);
 }
 
 function closePage() {
   document.getElementById('playerPage').style.display = 'none';
-  document.getElementById('mainContent').style.display = '';
+  document.getElementById('mainContent').style.display = 'block';
+  localStorage.removeItem('kbo_player');
 }
 
 const PLOTLY_CFG = {displayModeBar:false, responsive:true};
@@ -736,10 +738,15 @@ document.getElementById('ipFilter').addEventListener('input', function(){
 })();
 applyFilters();
 
-// 마지막 탭 복원
+// 마지막 탭 + 선수 페이지 복원
 (()=>{
-  const saved = localStorage.getItem('kbo_tab');
-  if (saved && ['bat','pit','team'].includes(saved)) showTab(saved);
+  const savedPlayer = localStorage.getItem('kbo_player');
+  if (savedPlayer) {
+    openPage(savedPlayer);
+    return;
+  }
+  const savedTab = localStorage.getItem('kbo_tab');
+  if (savedTab && ['bat','pit','team'].includes(savedTab)) showTab(savedTab);
 })();
 </script>
 <script>
