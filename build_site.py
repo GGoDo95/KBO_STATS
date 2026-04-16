@@ -109,55 +109,90 @@ html = f"""<!DOCTYPE html>
   table.dataTable td, table.dataTable th {{ font-size:0.82rem; white-space:nowrap; }}
   .player-link {{ color:#003580; cursor:pointer; font-weight:600; text-decoration:underline dotted; }}
   .player-link:hover {{ color:#0056d6; }}
-  /* 모달 */
-  .modal-overlay {{
-    position:fixed; inset:0; background:rgba(0,0,0,.5);
-    display:flex; align-items:center; justify-content:center;
-    z-index:9999; padding:16px;
+  /* 선수 상세 페이지 */
+  #playerPage {{
+    display:none; animation:pageIn .2s ease;
   }}
-  .modal-box {{
-    background:#fff; border-radius:12px; max-width:480px; width:100%;
-    max-height:90vh; overflow-y:auto;
-    box-shadow:0 8px 32px rgba(0,0,0,.25);
-    animation:modalIn .15s ease;
+  @keyframes pageIn {{ from{{opacity:0;transform:translateY(12px)}} to{{opacity:1;transform:translateY(0)}} }}
+  .page-back {{
+    display:inline-flex; align-items:center; gap:6px;
+    background:none; border:none; color:#003580;
+    font-size:0.95rem; font-weight:600; cursor:pointer; padding:0 0 12px 0;
   }}
-  @keyframes modalIn {{ from{{opacity:0;transform:scale(.95)}} to{{opacity:1;transform:scale(1)}} }}
-  .modal-header {{
-    display:flex; align-items:center; gap:14px;
-    padding:16px 20px; border-bottom:1px solid #e9ecef;
-    position:sticky; top:0; background:#fff; z-index:1;
+  .page-back:hover {{ color:#0056d6; }}
+  .player-card {{
+    background:#fff; border-radius:12px; overflow:hidden;
+    box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:20px;
   }}
-  .modal-photo {{
-    width:72px; height:88px; object-fit:cover; border-radius:6px;
-    background:#f0f0f0; flex-shrink:0;
+  .player-card-hero {{
+    display:flex; gap:20px; padding:24px;
+    background:linear-gradient(135deg, #003580 0%, #0056d6 100%);
+    color:#fff; align-items:flex-end;
   }}
-  .modal-photo-placeholder {{
-    width:72px; height:88px; border-radius:6px;
-    background:#e9ecef; display:flex; align-items:center;
-    justify-content:center; font-size:2rem; flex-shrink:0;
+  .player-hero-photo {{
+    width:100px; height:120px; object-fit:cover; border-radius:8px;
+    border:3px solid rgba(255,255,255,.3); flex-shrink:0;
+    background:#1a4a9a;
   }}
-  .modal-name {{ font-size:1.3rem; font-weight:700; }}
-  .modal-close {{
-    margin-left:auto; background:none; border:none;
-    font-size:1.4rem; cursor:pointer; color:#666; line-height:1;
+  .player-hero-info {{ flex:1; }}
+  .player-hero-number {{ font-size:0.85rem; opacity:.7; margin-bottom:2px; }}
+  .player-hero-name {{ font-size:1.8rem; font-weight:800; line-height:1.1; margin-bottom:6px; }}
+  .player-hero-sub {{ font-size:0.9rem; opacity:.85; }}
+  .player-card-body {{ padding:20px 24px; }}
+  .info-grid {{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:16px 24px;
   }}
-  .modal-body {{ padding:16px 20px; }}
-  .profile-grid {{
-    display:grid; grid-template-columns:1fr 1fr; gap:8px 16px;
+  .info-item {{ display:flex; flex-direction:column; gap:3px; }}
+  .info-label {{ font-size:0.72rem; color:#888; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }}
+  .info-value {{ font-size:1rem; font-weight:700; color:#212529; }}
+  .info-item.span2 {{ grid-column:span 2; }}
+  .info-item.span3 {{ grid-column:span 3; }}
+  .stats-section {{ background:#fff; border-radius:12px; padding:20px 24px; box-shadow:0 2px 12px rgba(0,0,0,.08); }}
+  .stats-section h6 {{ font-weight:700; color:#003580; margin-bottom:14px; font-size:0.9rem; text-transform:uppercase; letter-spacing:.05em; }}
+  .stats-grid {{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:12px;
   }}
-  .profile-item {{ display:flex; flex-direction:column; }}
-  .profile-label {{ font-size:0.72rem; color:#888; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }}
-  .profile-value {{ font-size:0.95rem; font-weight:600; color:#212529; }}
-  .profile-item.full {{ grid-column:1/-1; }}
-  @media (max-width:480px) {{
-    .profile-grid {{ grid-template-columns:1fr; }}
-    .profile-item.full {{ grid-column:1; }}
+  .stat-box {{
+    text-align:center; background:#f8f9fa; border-radius:8px; padding:10px 6px;
+  }}
+  .stat-box-val {{ font-size:1.2rem; font-weight:800; color:#003580; }}
+  .stat-box-lbl {{ font-size:0.68rem; color:#888; font-weight:600; margin-top:2px; }}
+  @media (max-width:600px) {{
+    .info-grid {{ grid-template-columns:repeat(2,1fr); }}
+    .info-item.span2 {{ grid-column:span 2; }}
+    .info-item.span3 {{ grid-column:span 2; }}
+    .player-hero-name {{ font-size:1.4rem; }}
+    .player-hero-photo {{ width:72px; height:88px; }}
   }}
 </style>
 </head>
 <body>
 <div class="container-fluid py-3 px-4">
 
+<!-- 선수 상세 페이지 -->
+<div id="playerPage">
+  <button class="page-back" onclick="closePage()">&#8592; 목록으로</button>
+  <div class="player-card">
+    <div class="player-card-hero">
+      <img id="pagePhoto" class="player-hero-photo" src="" alt="" onerror="this.style.display='none'">
+      <div class="player-hero-info">
+        <div id="pageNumber" class="player-hero-number"></div>
+        <div id="pageName" class="player-hero-name"></div>
+        <div id="pagePos" class="player-hero-sub"></div>
+      </div>
+    </div>
+    <div class="player-card-body">
+      <div id="pageInfoGrid" class="info-grid"></div>
+    </div>
+  </div>
+  <div class="stats-section">
+    <h6>시즌 기록</h6>
+    <div id="pageStats" class="stats-grid"></div>
+  </div>
+</div>
+
+<!-- 메인 콘텐츠 -->
+<div id="mainContent">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h1>⚾ KBO STATS</h1>
     <small class="text-muted">koreabaseball.com &nbsp;|&nbsp; 업데이트: {updated}</small>
@@ -243,24 +278,8 @@ html = f"""<!DOCTYPE html>
     </div>
   </div>
 
-</div>
-
-<!-- 선수 프로필 모달 -->
-<div id="profileModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeProfile()">
-  <div class="modal-box">
-    <div class="modal-header">
-      <div id="modalPhoto"></div>
-      <div>
-        <div id="modalName" class="modal-name"></div>
-        <div id="modalTeam" class="mt-1"></div>
-      </div>
-      <button class="modal-close" onclick="closeProfile()">×</button>
-    </div>
-    <div class="modal-body">
-      <div id="modalGrid" class="profile-grid"></div>
-    </div>
-  </div>
-</div>
+</div><!-- /mainContent -->
+</div><!-- /container-fluid -->
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -285,67 +304,82 @@ function teamColor(t) {{ return TC[t] || '#aaa'; }}
 
 function round2(v) {{ return Math.round(v*100)/100; }}
 
-// ── 선수 프로필 모달 ────────────────────────────────────
+// ── 선수 상세 페이지 ────────────────────────────────────
 
 function playerLink(name) {{
-  return `<span class="player-link" onclick="showProfile(${{JSON.stringify(name)}})">${{name}}</span>`;
+  // data-name 속성 사용 → 따옴표 충돌 방지
+  return `<span class="player-link" data-name="${{name.replace(/"/g,'&quot;')}}" onclick="openPage(this.dataset.name)">${{name}}</span>`;
 }}
 
-function showProfile(name) {{
+function openPage(name) {{
   const p = PROFILES[name];
-  const modal = document.getElementById('profileModal');
-
-  document.getElementById('modalName').textContent = name;
-
-  // 팀 배지
-  const team = p && p['팀'] || '';
-  document.getElementById('modalTeam').innerHTML = team ? teamBadge(team) : '';
 
   // 사진
-  const photoEl = document.getElementById('modalPhoto');
+  const photo = document.getElementById('pagePhoto');
   if (p && p['사진']) {{
-    photoEl.innerHTML = `<img src="${{p['사진']}}" class="modal-photo" onerror="this.parentNode.innerHTML='<div class=modal-photo-placeholder>👤</div>'">`;
+    photo.src = p['사진'];
+    photo.style.display = '';
   }} else {{
-    photoEl.innerHTML = '<div class="modal-photo-placeholder">👤</div>';
+    photo.style.display = 'none';
   }}
 
-  // 정보 그리드
-  const grid = document.getElementById('modalGrid');
-  if (!p) {{
-    grid.innerHTML = '<p class="text-muted">프로필 정보가 없습니다.</p>';
-    modal.style.display = 'flex';
-    return;
-  }}
-  const FIELDS = [
-    {{'key':'등번호',       'label':'등번호'}},
-    {{'key':'포지션',       'label':'포지션'}},
-    {{'key':'생년월일',     'label':'생년월일'}},
-    {{'key':'신장/체중',    'label':'신장/체중'}},
-    {{'key':'연봉',         'label':'연봉'}},
-    {{'key':'입단년도',     'label':'입단년도'}},
-    {{'key':'지명순위',     'label':'지명순위', 'full':true}},
-    {{'key':'입단 계약금',  'label':'계약금'}},
-    {{'key':'경력',         'label':'경력', 'full':true}},
+  document.getElementById('pageName').textContent = name;
+  document.getElementById('pageNumber').textContent = p ? (p['등번호'] || '') : '';
+  document.getElementById('pagePos').innerHTML = p
+    ? [p['포지션']||'', p['신장/체중']||''].filter(Boolean).join(' &nbsp;|&nbsp; ')
+    : '';
+
+  // 상세 정보 그리드
+  const INFO_FIELDS = [
+    {{'key':'생년월일',    'label':'생년월일',   'span':1}},
+    {{'key':'연봉',        'label':'연봉',        'span':1}},
+    {{'key':'입단 계약금', 'label':'계약금',      'span':1}},
+    {{'key':'입단년도',    'label':'입단년도',    'span':1}},
+    {{'key':'지명순위',    'label':'지명순위',    'span':2}},
+    {{'key':'경력',        'label':'경력',        'span':3}},
   ];
-  grid.innerHTML = FIELDS.map(f => {{
-    const val = p[f.key];
-    if (!val) return '';
-    return `<div class="profile-item${{f.full?' full':''}}">
-      <span class="profile-label">${{f.label}}</span>
-      <span class="profile-value">${{val}}</span>
-    </div>`;
-  }}).join('');
+  const grid = document.getElementById('pageInfoGrid');
+  if (p) {{
+    grid.innerHTML = INFO_FIELDS.map(f => {{
+      const val = p[f.key]; if (!val) return '';
+      const cls = f.span===3?'span3':f.span===2?'span2':'';
+      return `<div class="info-item ${{cls}}">
+        <span class="info-label">${{f.label}}</span>
+        <span class="info-value">${{val}}</span>
+      </div>`;
+    }}).join('');
+  }} else {{
+    grid.innerHTML = '<p class="text-muted small">프로필 정보가 없습니다.</p>';
+  }}
 
-  modal.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+  // 시즌 스탯
+  const allStats = [...BAT_DATA, ...PIT_DATA].filter(r=>r['선수명']===name);
+  const BAT_SHOW = ['시즌','팀','AVG','HR','RBI','OBP','SLG','OPS','wRC+','bWAR'];
+  const PIT_SHOW = ['시즌','팀','ERA','W','L','SV','IP','WHIP','FIP','pWAR'];
+  const isBat = allStats.length && allStats[0]['PA'] != null;
+  const SHOW  = isBat ? BAT_SHOW : PIT_SHOW;
+  const latest = allStats.sort((a,b)=>b['시즌']-a['시즌'])[0];
+  const statsEl = document.getElementById('pageStats');
+  if (latest) {{
+    statsEl.innerHTML = SHOW.filter(k=>latest[k]!=null).map(k=>
+      `<div class="stat-box">
+        <div class="stat-box-val">${{latest[k]}}</div>
+        <div class="stat-box-lbl">${{k}}</div>
+      </div>`
+    ).join('');
+  }} else {{
+    statsEl.innerHTML = '<p class="text-muted small">스탯 데이터 없음</p>';
+  }}
+
+  document.getElementById('playerPage').style.display = '';
+  document.getElementById('mainContent').style.display = 'none';
+  window.scrollTo(0,0);
 }}
 
-function closeProfile() {{
-  document.getElementById('profileModal').style.display = 'none';
-  document.body.style.overflow = '';
+function closePage() {{
+  document.getElementById('playerPage').style.display = 'none';
+  document.getElementById('mainContent').style.display = '';
 }}
-
-document.addEventListener('keydown', e => {{ if(e.key==='Escape') closeProfile(); }});
 
 const PLOTLY_CFG = {{displayModeBar:false, responsive:true}};
 const BASE_LAY = {{
