@@ -19,7 +19,9 @@
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
   body { font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
-          background:#f8f9fa; padding-bottom:env(safe-area-inset-bottom); }
+          background:#f8f9fa;
+          padding-top:env(safe-area-inset-top,0px);
+          padding-bottom:env(safe-area-inset-bottom,0px); }
   h1 { font-size:1.4rem; font-weight:700; }
   .nav-tabs .nav-link { font-weight:600; color:#495057; padding:10px 16px; }
   .nav-tabs .nav-link.active { color:#003580; border-bottom:3px solid #003580; }
@@ -47,12 +49,23 @@
     animation:pageIn .2s ease;
   }
   @keyframes pageIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-  .page-back {
-    display:inline-flex; align-items:center; gap:6px;
-    background:none; border:none; color:#003580;
-    font-size:0.95rem; font-weight:600; cursor:pointer; padding:0 0 12px 0;
+  .page-back-bar {
+    position:sticky; top:0; z-index:100;
+    background:#fff; border-bottom:1px solid #e9ecef;
+    padding:10px 16px;
+    display:flex; align-items:center;
+    margin:-12px -16px 16px -16px;  /* container padding 상쇄 */
   }
-  .page-back:hover { color:#0056d6; }
+  .page-back {
+    display:inline-flex; align-items:center; gap:8px;
+    background:none; border:none; color:#003580;
+    font-size:1rem; font-weight:600; cursor:pointer; padding:4px 0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .page-back:active { opacity:.6; }
+  .page-back-title {
+    font-size:1rem; font-weight:700; color:#212529; margin-left:4px;
+  }
   .player-card {
     background:#fff; border-radius:12px; overflow:hidden;
     box-shadow:0 2px 12px rgba(0,0,0,.08); margin-bottom:20px;
@@ -104,7 +117,10 @@
 
 <!-- 선수 상세 페이지 -->
 <div id="playerPage" style="display:none">
-  <button class="page-back" onclick="closePage()">&#8592; 목록으로</button>
+  <div class="page-back-bar">
+    <button class="page-back" onclick="closePage()">&#8592;</button>
+    <span class="page-back-title">선수 정보</span>
+  </div>
   <div class="player-card">
     <div class="player-card-hero">
       <img id="pagePhoto" class="player-hero-photo" src="" alt="" onerror="this.style.display='none'">
@@ -244,6 +260,13 @@ function playerLink(name) {
   return `<span class="player-link" data-name="${name.replace(/"/g,'&quot;')}" onclick="openPage(this.dataset.name)">${name}</span>`;
 }
 
+// popstate → 물리 뒤로가기 / 스와이프 / 브라우저 뒤로가기 처리
+let _playerPageOpen = false;
+
+window.addEventListener('popstate', ()=>{
+  if (_playerPageOpen) _doClosePage();
+});
+
 function openPage(name) {
   const p = PROFILES[name];
 
@@ -307,13 +330,21 @@ function openPage(name) {
   document.getElementById('playerPage').style.display = 'block';
   document.getElementById('mainContent').style.display = 'none';
   localStorage.setItem('kbo_player', name);
+  _playerPageOpen = true;
+  history.pushState({player: name}, '');
   window.scrollTo(0,0);
 }
 
-function closePage() {
+function _doClosePage() {
+  _playerPageOpen = false;
   document.getElementById('playerPage').style.display = 'none';
   document.getElementById('mainContent').style.display = 'block';
   localStorage.removeItem('kbo_player');
+}
+
+function closePage() {
+  // 버튼에서 호출 → history.back() → popstate → _doClosePage()
+  history.back();
 }
 
 const PLOTLY_CFG = {displayModeBar:false, responsive:true};
@@ -741,9 +772,11 @@ applyFilters();
 // 마지막 탭 + 선수 페이지 복원
 (()=>{
   const savedPlayer = localStorage.getItem('kbo_player');
-  if (savedPlayer) {
+  if (savedPlayer && PROFILES[savedPlayer]) {
     openPage(savedPlayer);
     return;
+  } else {
+    localStorage.removeItem('kbo_player');
   }
   const savedTab = localStorage.getItem('kbo_tab');
   if (savedTab && ['bat','pit','team'].includes(savedTab)) showTab(savedTab);
