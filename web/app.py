@@ -28,14 +28,16 @@ else:
     st.caption("데이터 출처: koreabaseball.com | 세이버 지표 직접 계산")
 
 TEAMS = ["전체", "LG", "두산", "KT", "SSG", "NC", "KIA", "롯데", "삼성", "한화", "키움"]
+from config import SEASONS
 
 # ── 사이드바 ──────────────────────────────────────────────
 with st.sidebar:
     st.header("설정")
-    if st.button("데이터 수집 (전체 팀)", type="primary"):
-        with st.spinner("KBO에서 전체 데이터 수집 중... (2~3분 소요)"):
+    seasons_to_collect = st.multiselect("수집 시즌", SEASONS, default=SEASONS)
+    if st.button("데이터 수집", type="primary"):
+        with st.spinner("KBO에서 데이터 수집 중... (시즌당 2~3분 소요)"):
             try:
-                run(team="", force_crawl=True)
+                run(seasons=seasons_to_collect, team="", force_crawl=True)
                 st.success("완료!")
                 st.cache_data.clear()
                 st.rerun()
@@ -63,10 +65,13 @@ def load_data():
         return db.load_batting(), db.load_pitching()
     # CSV fallback — 클라우드 배포 등 DB 없는 환경
     data_dir = Path(__file__).parent.parent / "data"
-    bat_files = sorted(data_dir.glob("*_batting.csv"))
-    pit_files = sorted(data_dir.glob("*_pitching.csv"))
+    bat_files = sorted(data_dir.glob("*_전체_batting.csv"))
+    pit_files = sorted(data_dir.glob("*_전체_pitching.csv"))
     if bat_files and pit_files:
-        return pd.read_csv(bat_files[-1]), pd.read_csv(pit_files[-1])
+        return (
+            pd.concat([pd.read_csv(f) for f in bat_files], ignore_index=True),
+            pd.concat([pd.read_csv(f) for f in pit_files], ignore_index=True),
+        )
     return None, None
 
 
@@ -76,20 +81,26 @@ if bat_all is None:
     st.warning("데이터 없음. 사이드바에서 '데이터 수집'을 클릭하세요.")
     st.stop()
 
+available_seasons = sorted(bat_all["시즌"].unique().tolist(), reverse=True) if "시즌" in bat_all.columns else [2025]
 
-# ── 팀 필터 (공통) ────────────────────────────────────────
-col_tf, _ = st.columns([2, 6])
+# ── 시즌 + 팀 필터 (공통) ─────────────────────────────────
+col_s, col_tf, _ = st.columns([2, 2, 4])
+with col_s:
+    season_filter = st.selectbox("시즌", ["전체"] + available_seasons, index=0)
 with col_tf:
     team_filter = st.selectbox("팀 필터", TEAMS, index=0)
 
-def filter_team(df):
-    if team_filter == "전체" or "팀" not in df.columns:
-        return df
-    return df[df["팀"] == team_filter].reset_index(drop=True)
+def filter_df(df):
+    result = df.copy()
+    if season_filter != "전체" and "시즌" in result.columns:
+        result = result[result["시즌"] == int(season_filter)]
+    if team_filter != "전체" and "팀" in result.columns:
+        result = result[result["팀"] == team_filter]
+    return result.reset_index(drop=True)
 
 
-bat_df = filter_team(bat_all)
-pit_df = filter_team(pit_all)
+bat_df = filter_df(bat_all)
+pit_df = filter_df(pit_all)
 
 
 # ── 탭 ───────────────────────────────────────────────────

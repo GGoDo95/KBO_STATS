@@ -13,7 +13,7 @@
 """
 
 import pandas as pd
-from config import FIP_CONSTANT, LEAGUE_ERA, PARK_FACTORS, DEFAULT_PARK_FACTOR
+from config import get_season_config, PARK_FACTORS, DEFAULT_PARK_FACTOR
 
 # 리그 평균 홈런/플라이볼 비율 (KBO 추정)
 LEAGUE_HR_FB_RATE = 0.115
@@ -53,48 +53,24 @@ def _ip_to_float(ip_series: pd.Series) -> pd.Series:
     return ip_series.apply(convert)
 
 
-def calc_fip(df: pd.DataFrame, ip_float: pd.Series) -> pd.Series:
-    """
-    FIP = (13*HR + 3*(BB+HBP) - 2*K) / IP + FIP_constant
-
-    수비와 무관하게 투수 본인의 책임인 이벤트만으로 계산.
-    홈런 > 볼넷/사구 > 탈삼진 순으로 가중.
-    """
+def calc_fip(df: pd.DataFrame, ip_float: pd.Series, fip_constant: float) -> pd.Series:
     hbp = df.get("HBP", pd.Series(0, index=df.index))
     numerator = 13 * df["HR"] + 3 * (df["BB"] + hbp) - 2 * df["SO"]
-    fip = numerator / ip_float.replace(0, float("nan")) + FIP_CONSTANT
-    return fip.round(2)
+    return (numerator / ip_float.replace(0, float("nan")) + fip_constant).round(2)
 
 
-def calc_xfip(df: pd.DataFrame, ip_float: pd.Series) -> pd.Series:
-    """
-    xFIP = (13*(FB*리그HR/FB율) + 3*(BB+HBP) - 2*K) / IP + FIP_constant
-
-    FIP에서 홈런 대신 플라이볼에 리그 평균 HR/FB 비율을 적용.
-    홈런 운을 제거해 투수의 진짜 실력에 더 가까운 지표.
-    플라이볼 데이터가 없어 AB * 추정비율로 근사.
-    """
+def calc_xfip(df: pd.DataFrame, ip_float: pd.Series, fip_constant: float) -> pd.Series:
     hbp = df.get("HBP", pd.Series(0, index=df.index))
-    # 플라이볼 수 추정 (트래킹 데이터 없음)
     estimated_fb = df["AB"] * ESTIMATED_FB_RATE if "AB" in df.columns else df["HR"] / LEAGUE_HR_FB_RATE
     expected_hr = estimated_fb * LEAGUE_HR_FB_RATE
-
     numerator = 13 * expected_hr + 3 * (df["BB"] + hbp) - 2 * df["SO"]
-    xfip = numerator / ip_float.replace(0, float("nan")) + FIP_CONSTANT
-    return xfip.round(2)
+    return (numerator / ip_float.replace(0, float("nan")) + fip_constant).round(2)
 
 
-def calc_era_plus(df: pd.DataFrame) -> pd.Series:
-    """
-    ERA+ = (리그평균ERA / ERA) * 파크팩터 * 100
-
-    100이 리그 평균. 높을수록 좋음.
-    잠실 구장의 타자 친화적 환경(파크팩터)을 보정.
-    """
+def calc_era_plus(df: pd.DataFrame, league_era: float) -> pd.Series:
     era = df["ERA"].replace(0, float("nan"))
     pf = df["팀"].map(PARK_FACTORS).fillna(DEFAULT_PARK_FACTOR) if "팀" in df.columns else DEFAULT_PARK_FACTOR
-    era_plus = (LEAGUE_ERA / era) * (1 / pf) * 100
-    return era_plus.round(1)
+    return ((league_era / era) * (1 / pf) * 100).round(1)
 
 
 def calc_k9(df: pd.DataFrame, ip_float: pd.Series) -> pd.Series:
@@ -118,41 +94,29 @@ def calc_whip(df: pd.DataFrame, ip_float: pd.Series) -> pd.Series:
 
 
 def calc_pitching_war(df: pd.DataFrame, fip: pd.Series, ip_float: pd.Series) -> pd.Series:
-    """
-    투수 WAR (FIP 기반)
-
-    pWAR = (대체수준ERA - FIP) / 9 * IP / RUNS_PER_WIN * 파크팩터보정
-
-    대체 수준 투수보다 얼마나 많은 실점을 막았는지를 승리로 환산.
-    """
     pf = df["팀"].map(PARK_FACTORS).fillna(DEFAULT_PARK_FACTOR) if "팀" in df.columns else DEFAULT_PARK_FACTOR
     runs_saved = (REPLACEMENT_ERA - fip) / 9 * ip_float
-    war = runs_saved / RUNS_PER_WIN * (1 / pf)
-    return war.round(2)
+    return (runs_saved / RUNS_PER_WIN * (1 / pf)).round(2)
 
 
-MIN_IP_FOR_SABERS = 5.0  # 이 미만은 세이버 지표 NaN 처리
+MIN_IP_FOR_SABERS = 5.0
 
-def calculate_all(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    투수 DataFrame에 모든 세이버 지표를 추가해 반환.
-    입력 DataFrame은 crawl_pitching()의 출력을 기대.
-    """
+def calculate_all(df: pd.DataFrame, season: int = 2025) -> pd.DataFrame:
+    cfg = get_season_config(season)
     result = df.copy()
     ip_float = _ip_to_float(result["IP"])
     result["IP_float"] = ip_float
 
-    fip = calc_fip(result, ip_float)
+    fip = calc_fip(result, ip_float, cfg["FIP_CONSTANT"])
     result["FIP"]  = fip
-    result["xFIP"] = calc_xfip(result, ip_float)
-    result["ERA+"] = calc_era_plus(result)
+    result["xFIP"] = calc_xfip(result, ip_float, cfg["FIP_CONSTANT"])
+    result["ERA+"] = calc_era_plus(result, cfg["LEAGUE_ERA"])
     result["K/9"]  = calc_k9(result, ip_float)
     result["BB/9"] = calc_bb9(result, ip_float)
     result["K/BB"] = calc_k_bb(result)
     result["WHIP"] = calc_whip(result, ip_float)
     result["pWAR"] = calc_pitching_war(result, fip, ip_float)
 
-    # 소표본 투수 세이버 지표 NaN 처리
     small = ip_float < MIN_IP_FOR_SABERS
     for col in ["FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "WHIP", "pWAR"]:
         if col in result.columns:

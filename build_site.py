@@ -22,10 +22,11 @@ pit_files = sorted(data_dir.glob("*전체*pitching.csv"))
 if not bat_files or not pit_files:
     raise FileNotFoundError("data/ 아래 전체 CSV 없음. python main.py 먼저 실행하세요.")
 
-bat = pd.read_csv(bat_files[-1])
-pit = pd.read_csv(pit_files[-1])
+bat = pd.concat([pd.read_csv(f) for f in bat_files], ignore_index=True)
+pit = pd.concat([pd.read_csv(f) for f in pit_files], ignore_index=True)
 
 updated = datetime.datetime.fromtimestamp(bat_files[-1].stat().st_mtime).strftime("%Y-%m-%d")
+AVAILABLE_SEASONS = sorted(bat["시즌"].unique().tolist()) if "시즌" in bat.columns else [2025]
 
 TEAMS = sorted(bat["팀"].dropna().unique().tolist())
 
@@ -152,7 +153,8 @@ team_cols = ["팀", "타자WAR", "투수WAR", "총WAR", "평균wRC", "평균FIP"
 bat_json  = bat[bat_cols].round(3).to_json(orient="records", force_ascii=False)
 pit_json  = pit[pit_cols].round(3).to_json(orient="records", force_ascii=False)
 team_json = team_df[[c for c in team_cols if c in team_df.columns]].to_json(orient="records", force_ascii=False)
-teams_json = json.dumps(["전체"] + TEAMS, ensure_ascii=False)
+teams_json   = json.dumps(["전체"] + TEAMS, ensure_ascii=False)
+seasons_json = json.dumps(["전체"] + AVAILABLE_SEASONS, ensure_ascii=False)
 
 # ── HTML 렌더 ─────────────────────────────────────────────
 
@@ -212,8 +214,13 @@ html = f"""<!DOCTYPE html>
     <small class="text-muted">데이터: koreabaseball.com &nbsp;|&nbsp; 최근 업데이트: {updated}</small>
   </div>
 
-  <!-- 팀 필터 -->
+  <!-- 시즌/팀 필터 -->
   <div class="filter-bar">
+    <div>
+      <label class="form-label fw-semibold mb-1">시즌</label>
+      <select id="seasonFilter" class="form-select form-select-sm" style="width:100px">
+      </select>
+    </div>
     <div>
       <label class="form-label fw-semibold mb-1">팀 필터</label>
       <select id="teamFilter" class="form-select form-select-sm" style="width:130px">
@@ -306,6 +313,7 @@ const BAT_DATA  = {bat_json};
 const PIT_DATA  = {pit_json};
 const TEAM_DATA = {team_json};
 const TEAMS     = {teams_json};
+const SEASONS   = {seasons_json};
 
 const TEAM_COLORS = {json.dumps(TEAM_COLORS, ensure_ascii=False)};
 
@@ -314,7 +322,9 @@ function teamBadge(team) {{
   return `<span class="team-badge" style="background:${{c}}">${{team}}</span>`;
 }}
 
-// 팀 필터 드롭다운 채우기
+// 시즌/팀 드롭다운 채우기
+const seasonSel = document.getElementById('seasonFilter');
+SEASONS.forEach(s => {{ const o = document.createElement('option'); o.value = s; o.textContent = s; seasonSel.appendChild(o); }});
 const sel = document.getElementById('teamFilter');
 TEAMS.forEach(t => {{ const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); }});
 
@@ -345,8 +355,9 @@ function makeColumns(data) {{
   }}));
 }}
 
-function filterData(data, team, minPA, minIP) {{
+function filterData(data, season, team, minPA, minIP) {{
   return data.filter(r => {{
+    if (season !== '전체' && String(r['시즌']) !== String(season)) return false;
     if (team !== '전체' && r['팀'] !== team) return false;
     if (minPA > 0 && r['PA'] !== undefined && r['PA'] < minPA) return false;
     if (minIP > 0 && r['IP_float'] !== undefined && r['IP_float'] < minIP) return false;
@@ -397,13 +408,15 @@ initTeam(TEAM_DATA);
 
 // 필터 이벤트
 function applyFilters() {{
-  const team  = sel.value;
-  const minPA = parseInt(document.getElementById('paFilter').value);
-  const minIP = parseInt(document.getElementById('ipFilter').value);
-  initBat(filterData(BAT_DATA, team, minPA, 0));
-  initPit(filterData(PIT_DATA, team, 0, minIP));
+  const season = seasonSel.value;
+  const team   = sel.value;
+  const minPA  = parseInt(document.getElementById('paFilter').value);
+  const minIP  = parseInt(document.getElementById('ipFilter').value);
+  initBat(filterData(BAT_DATA, season, team, minPA, 0));
+  initPit(filterData(PIT_DATA, season, team, 0, minIP));
 }}
 
+seasonSel.addEventListener('change', applyFilters);
 sel.addEventListener('change', applyFilters);
 document.getElementById('paFilter').addEventListener('input', function() {{
   document.getElementById('paVal').textContent = this.value; applyFilters();
