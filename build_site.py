@@ -339,21 +339,28 @@ function renderBatCharts(data) {{
     margin:{{...BASE_LAY.margin, b:50}},
   }}, PLOTLY_CFG);
 
-  // bWAR Top 15
-  const bwar = [...data].filter(r=>r['bWAR']!=null)
-                 .sort((a,b)=>a['bWAR']-b['bWAR']).slice(-15);
+  // wRC+ vs bWAR 버블
+  const vld = data.filter(r=>r['wRC+']!=null && r['bWAR']!=null);
   Plotly.newPlot('chart-bwar', [{{
-    type:'bar', orientation:'h',
-    x:bwar.map(r=>r['bWAR']), y:bwar.map(r=>r['선수명']),
-    marker:{{color:bwar.map(r=>teamColor(r['팀'])), line:{{color:'#fff',width:1}}}},
-    customdata:bwar.map(r=>[r['팀'],r['PA'],r['wRC+']]),
-    hovertemplate:'<b>%{{y}}</b> (%{{customdata[0]}})<br>bWAR: <b>%{{x}}</b><br>PA: %{{customdata[1]}} &nbsp; wRC+: %{{customdata[2]}}<extra></extra>',
+    type:'scatter', mode:'markers',
+    x:vld.map(r=>r['bWAR']), y:vld.map(r=>r['wRC+']),
+    marker:{{
+      color:vld.map(r=>teamColor(r['팀'])),
+      size:vld.map(r=>Math.sqrt((r['PA']||1)/Math.PI)*3.2),
+      opacity:0.82, line:{{color:'#fff',width:0.8}},
+    }},
+    customdata:vld.map(r=>[r['선수명'],r['팀'],r['PA'],r['AVG']]),
+    hovertemplate:'<b>%{{customdata[0]}}</b> (%{{customdata[1]}})<br>bWAR: %{{x}} &nbsp; wRC+: %{{y}}<br>PA: %{{customdata[2]}} &nbsp; AVG: %{{customdata[3]}}<extra></extra>',
   }}], {{
     ...BASE_LAY,
-    title:{{text:'bWAR Top 15', font:{{size:14,color:'#212529'}}}},
-    xaxis:{{title:'bWAR', gridcolor:'#e9ecef', zeroline:true, zerolinecolor:'#adb5bd'}},
-    yaxis:{{tickfont:{{size:12}}}},
-    height:440, margin:{{t:44,r:24,b:50,l:90}},
+    title:{{text:'공격 가치(wRC+) vs 종합 가치(bWAR)  —  버블 크기=PA', font:{{size:13,color:'#212529'}}}},
+    xaxis:{{title:'bWAR (종합 가치)', gridcolor:'#e9ecef', zeroline:true, zerolinecolor:'#adb5bd'}},
+    yaxis:{{title:'wRC+ (공격 가치)', gridcolor:'#e9ecef'}},
+    shapes:[{{type:'line',x0:0,y0:100,x1:0,y1:100,line:{{color:'#6c757d',dash:'dot',width:1.5}}}}],
+    annotations:[{{x:vld.reduce((m,r)=>Math.max(m,r['bWAR']||0),0)*0.05,y:100,
+                   text:'wRC+ 100 (리그평균)',showarrow:false,
+                   font:{{size:10,color:'#6c757d'}},xanchor:'left'}}],
+    height:440, margin:{{t:52,r:24,b:54,l:72}},
   }}, PLOTLY_CFG);
 }}
 
@@ -363,23 +370,33 @@ function renderPitCharts(data) {{
     return;
   }}
 
-  // K/9 vs BB/9
-  const kbb = data.filter(r=>r['K/9']!=null && r['BB/9']!=null);
+  // FIP vs xFIP (홈런 운 분석)
+  const fx = data.filter(r=>r['FIP']!=null && r['xFIP']!=null && r['FIP']<12 && r['xFIP']<12);
+  const fMax = Math.max(...fx.map(r=>Math.max(r['FIP'],r['xFIP'])), 1) + 0.3;
+  const fMin = Math.max(0, Math.min(...fx.map(r=>Math.min(r['FIP'],r['xFIP']))) - 0.3);
   Plotly.newPlot('chart-kbb', [{{
     type:'scatter', mode:'markers',
-    x:kbb.map(r=>r['BB/9']), y:kbb.map(r=>r['K/9']),
+    x:fx.map(r=>r['FIP']), y:fx.map(r=>r['xFIP']),
     marker:{{
-      color:kbb.map(r=>teamColor(r['팀'])),
-      size:kbb.map(r=>Math.sqrt((r['IP_float']||1)/Math.PI)*4),
-      opacity:0.8, line:{{color:'#fff',width:0.8}},
+      color:fx.map(r=>teamColor(r['팀'])),
+      size:fx.map(r=>Math.sqrt((r['IP_float']||1)/Math.PI)*4),
+      opacity:0.82, line:{{color:'#fff',width:0.8}},
     }},
-    customdata:kbb.map(r=>[r['선수명'],r['팀'],r['IP'],r['FIP']]),
-    hovertemplate:'<b>%{{customdata[0]}}</b> (%{{customdata[1]}})<br>K/9: %{{y}} &nbsp; BB/9: %{{x}}<br>IP: %{{customdata[2]}} &nbsp; FIP: %{{customdata[3]}}<extra></extra>',
+    customdata:fx.map(r=>[r['선수명'],r['팀'],r['IP'],r['ERA']]),
+    hovertemplate:'<b>%{{customdata[0]}}</b> (%{{customdata[1]}})<br>FIP: %{{x}} &nbsp; xFIP: %{{y}}<br>IP: %{{customdata[2]}} &nbsp; ERA: %{{customdata[3]}}<extra></extra>',
   }}], {{
     ...BASE_LAY,
-    title:{{text:'K/9 vs BB/9 (버블=이닝)', font:{{size:14,color:'#212529'}}}},
-    xaxis:{{title:'BB/9 (낮을수록 좋음)', gridcolor:'#e9ecef', autorange:'reversed'}},
-    yaxis:{{title:'K/9 (높을수록 좋음)', gridcolor:'#e9ecef'}},
+    title:{{text:'FIP vs xFIP  —  홈런 운 분석  (버블=이닝)', font:{{size:13,color:'#212529'}}}},
+    xaxis:{{title:'FIP', gridcolor:'#e9ecef', range:[fMin,fMax]}},
+    yaxis:{{title:'xFIP', gridcolor:'#e9ecef', range:[fMin,fMax]}},
+    shapes:[{{type:'line',x0:fMin,y0:fMin,x1:fMax,y1:fMax,
+              line:{{color:'#6c757d',dash:'dot',width:1.5}}}}],
+    annotations:[
+      {{x:fMin+(fMax-fMin)*0.72, y:fMin+(fMax-fMin)*0.58,
+        text:'FIP<xFIP: 홈런 운 좋음',showarrow:false,font:{{size:10,color:'#198754'}}}},
+      {{x:fMin+(fMax-fMin)*0.28, y:fMin+(fMax-fMin)*0.42,
+        text:'FIP>xFIP: 홈런 운 나쁨',showarrow:false,font:{{size:10,color:'#dc3545'}}}},
+    ],
     margin:{{...BASE_LAY.margin, b:50}},
   }}, PLOTLY_CFG);
 
