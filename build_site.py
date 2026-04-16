@@ -217,10 +217,15 @@ document.querySelectorAll('[data-tab]').forEach(btn=>{{
     btn.classList.add('active');
     const tab = btn.dataset.tab;
     ['bat','pit','team'].forEach(t=>document.getElementById('tab-'+t).style.display = t===tab?'':'none');
-    document.getElementById('paFilterWrap').style.display  = tab==='bat'  ? '' : 'none';
-    document.getElementById('ipFilterWrap').style.display  = tab==='pit'  ? '' : 'none';
-    // 탭 전환 후 차트 리사이즈
-    setTimeout(()=>Plotly.Plots.resize(document.querySelector('#tab-'+tab+' [id^=chart]')), 50);
+    document.getElementById('paFilterWrap').style.display = tab==='bat' ? '' : 'none';
+    document.getElementById('ipFilterWrap').style.display = tab==='pit' ? '' : 'none';
+    // 탭 전환 후 컬럼 정렬 보정 + 차트 리사이즈
+    setTimeout(()=>{{
+      if (tab==='bat'  && batDT)  batDT.columns.adjust().draw(false);
+      if (tab==='pit'  && pitDT)  pitDT.columns.adjust().draw(false);
+      if (tab==='team' && teamDT) teamDT.columns.adjust().draw(false);
+      document.querySelectorAll('#tab-'+tab+' [id^=chart]').forEach(el=>Plotly.Plots.resize(el));
+    }}, 50);
   }});
 }});
 
