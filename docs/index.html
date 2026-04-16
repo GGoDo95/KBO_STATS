@@ -180,11 +180,14 @@ document.querySelectorAll('[data-tab]').forEach(btn=>{
     ['bat','pit','team'].forEach(t=>document.getElementById('tab-'+t).style.display = t===tab?'':'none');
     document.getElementById('paFilterWrap').style.display = tab==='bat' ? '' : 'none';
     document.getElementById('ipFilterWrap').style.display = tab==='pit' ? '' : 'none';
-    // 탭 전환 후 컬럼 정렬 보정 + 차트 리사이즈
+    // 탭 전환 후 컬럼 정렬 보정 + 차트 렌더/리사이즈
     setTimeout(()=>{
       if (tab==='bat'  && batDT)  batDT.columns.adjust().draw(false);
       if (tab==='pit'  && pitDT)  pitDT.columns.adjust().draw(false);
-      if (tab==='team' && teamDT) teamDT.columns.adjust().draw(false);
+      if (tab==='team') {
+        renderTeamCharts(_lastBat, _lastPit);
+        if (teamDT) teamDT.columns.adjust().draw(false);
+      }
       document.querySelectorAll('#tab-'+tab+' [id^=chart]').forEach(el=>Plotly.Plots.resize(el));
     }, 50);
   });
@@ -509,6 +512,8 @@ function renderTeamCharts(batData, pitData) {
 
 // ── applyFilters ─────────────────────────────────────────
 
+let _lastBat = [], _lastPit = [];
+
 function applyFilters() {
   const season = seasonSel.value;
   const team   = teamSel.value;
@@ -517,12 +522,16 @@ function applyFilters() {
 
   const bd = filterData(BAT_DATA, season, team, minPA, 0);
   const pd = filterData(PIT_DATA, season, team, 0, minIP);
+  _lastBat = bd; _lastPit = pd;
 
   initBat(bd);
   initPit(pd);
   renderBatCharts(bd);
   renderPitCharts(pd);
-  renderTeamCharts(bd, pd);
+  // 팀 탭이 보이는 경우에만 즉시 렌더, 숨겨진 경우는 탭 전환 시 렌더
+  if (document.getElementById('tab-team').style.display !== 'none') {
+    renderTeamCharts(bd, pd);
+  }
 }
 
 // 시즌 변경 시 PA/IP 기본값 조정
