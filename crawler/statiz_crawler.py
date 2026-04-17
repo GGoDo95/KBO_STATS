@@ -4,6 +4,7 @@ statiz.co.kr 로그인 후 KBO 선수 스탯 크롤링.
 로그인 → 세션 유지 → 팀별/시즌별 스탯 페이지 파싱
 """
 
+import os
 import time
 import requests
 import pandas as pd
@@ -168,10 +169,16 @@ def _fetch_stat(
 def crawl_batting(
     team: str = "LG",
     season: int = SEASON,
-    user_id: str = "kodohyeon@naver.com",
-    password: str = "ko7524383",
+    user_id: str = None,
+    password: str = None,
 ) -> pd.DataFrame:
     """LG 트윈스 타자 기본 스탯 크롤링 (로그인 필요)."""
+    if user_id is None:
+        user_id = os.environ.get("STATIZ_ID", "")
+    if password is None:
+        password = os.environ.get("STATIZ_PW", "")
+    if not user_id or not password:
+        raise ValueError("환경변수 STATIZ_ID, STATIZ_PW를 설정하세요.")
     print(f"[크롤링] {season}시즌 {team} 타자 스탯 수집 중...")
     session = _login(user_id, password)
 
@@ -217,10 +224,16 @@ def crawl_batting(
 def crawl_pitching(
     team: str = "LG",
     season: int = SEASON,
-    user_id: str = "kodohyeon@naver.com",
-    password: str = "ko7524383",
+    user_id: str = None,
+    password: str = None,
 ) -> pd.DataFrame:
     """LG 트윈스 투수 기본 스탯 크롤링 (로그인 필요)."""
+    if user_id is None:
+        user_id = os.environ.get("STATIZ_ID", "")
+    if password is None:
+        password = os.environ.get("STATIZ_PW", "")
+    if not user_id or not password:
+        raise ValueError("환경변수 STATIZ_ID, STATIZ_PW를 설정하세요.")
     print(f"[크롤링] {season}시즌 {team} 투수 스탯 수집 중...")
     session = _login(user_id, password)
 

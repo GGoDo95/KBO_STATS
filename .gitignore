@@ -1,18 +1,32 @@
+# 민감 파일
+스탯티즈 로그인정보.txt
+tmp_keys.txt
+
+# 임시 파일
+tmp_*.html
+tmp_*.txt
+*.tmp
+
+# 데이터베이스
+data/*.db
+
 # Python
 __pycache__/
 *.py[cod]
-*.egg-info/
-.venv/
-venv/
-
-# Database (ephemeral — CSVs are the source of truth)
-data/*.db
-
-# Sensitive
-스탯티즈 로그인정보.txt
+*.pyo
 .env
-*.key
+venv/
+.venv/
 
-# OS
-.DS_Store
-Thumbs.db
+# IDE
+.vscode/
+.idea/
+
+# 테스트 파일
+data/pit_test.csv
+data/test_encoding.csv
+
+# Claude 내부 파일
+.claude/
+plan.md
+research.md

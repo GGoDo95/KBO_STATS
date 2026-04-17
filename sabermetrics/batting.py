@@ -80,8 +80,13 @@ def calculate_all(df: pd.DataFrame, season: int = 2025) -> pd.DataFrame:
     result["OPS+"]  = calc_ops_plus(result, cfg)
     result["bWAR"]  = calc_batting_war(result, woba, wrcp, cfg)
 
+    result["BB%"]  = (df["BB"] / df["PA"].replace(0, float("nan")) * 100).round(1)
+    result["K%"]   = (df["SO"] / df["PA"].replace(0, float("nan")) * 100).round(1)
+    result["BB/K"] = (df["BB"] / df["SO"].replace(0, float("nan"))).round(2)
+    result["wRAA"] = ((woba - cfg["LEAGUE_WOBA"]) / cfg["WOBA_SCALE"] * df["PA"]).round(1)
+
     small = result["PA"] < MIN_PA_FOR_SABERS
-    for col in ["BABIP", "wOBA", "wRC+", "OPS+", "bWAR", "ISO"]:
+    for col in ["BABIP", "wOBA", "wRC+", "OPS+", "bWAR", "ISO", "BB%", "K%", "BB/K", "wRAA"]:
         if col in result.columns:
             result.loc[small, col] = float("nan")
 

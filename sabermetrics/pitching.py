@@ -99,6 +99,19 @@ def calc_pitching_war(df: pd.DataFrame, fip: pd.Series, ip_float: pd.Series) -> 
     return (runs_saved / RUNS_PER_WIN * (1 / pf)).round(2)
 
 
+def calc_lob_pct(df: pd.DataFrame) -> pd.Series:
+    hbp = df.get("HBP", pd.Series(0, index=df.index))
+    num = df["H"] + df["BB"] + hbp - df["R"]
+    den = df["H"] + df["BB"] + hbp - 1.4 * df["HR"]
+    return (num / den.replace(0, float("nan")) * 100).round(1)
+
+
+def calc_kwera(df: pd.DataFrame, ip_float: pd.Series) -> pd.Series:
+    k9  = df["SO"] / ip_float.replace(0, float("nan")) * 9
+    bb9 = df["BB"] / ip_float.replace(0, float("nan")) * 9
+    return (3.00 + (bb9 - k9) * 0.27).round(2)
+
+
 MIN_IP_FOR_SABERS = 5.0
 
 def calculate_all(df: pd.DataFrame, season: int = 2025) -> pd.DataFrame:
@@ -117,8 +130,14 @@ def calculate_all(df: pd.DataFrame, season: int = 2025) -> pd.DataFrame:
     result["WHIP"] = calc_whip(result, ip_float)
     result["pWAR"] = calc_pitching_war(result, fip, ip_float)
 
+    result["LOB%"] = calc_lob_pct(result)
+    result["ERA-"] = (result["ERA"] / cfg["LEAGUE_ERA"] * 100).round(1)
+    result["FIP-"] = (fip / cfg["LEAGUE_FIP"] * 100).round(1)
+    result["kwERA"] = calc_kwera(result, ip_float)
+
     small = ip_float < MIN_IP_FOR_SABERS
-    for col in ["FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "WHIP", "pWAR"]:
+    for col in ["FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "WHIP", "pWAR",
+                "LOB%", "ERA-", "FIP-", "kwERA"]:
         if col in result.columns:
             result.loc[small, col] = float("nan")
 

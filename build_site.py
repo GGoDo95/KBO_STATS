@@ -38,13 +38,15 @@ TEAM_COLORS = {
 
 BAT_COLS = ["시즌", "선수명", "팀", "G", "PA", "AVG", "HR", "RBI", "R",
             "BB", "SO", "OBP", "SLG", "OPS",
-            "BABIP", "ISO", "wOBA", "wRC+", "OPS+", "bWAR"]
+            "BABIP", "ISO", "wOBA", "wRC+", "OPS+", "bWAR",
+            "BB%", "K%", "BB/K", "wRAA"]
 PIT_COLS = ["시즌", "선수명", "팀", "G", "W", "L", "SV", "HLD",
             "IP", "IP_float", "ERA", "WHIP", "SO", "BB", "HR",
-            "FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "pWAR"]
+            "FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "pWAR",
+            "LOB%", "ERA-", "FIP-", "kwERA"]
 
-BAT_SABER = ["BABIP", "ISO", "wOBA", "wRC+", "OPS+", "bWAR"]
-PIT_SABER = ["FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "pWAR"]
+BAT_SABER = ["BABIP", "ISO", "wOBA", "wRC+", "OPS+", "bWAR", "BB%", "K%", "BB/K", "wRAA"]
+PIT_SABER = ["FIP", "xFIP", "ERA+", "K/9", "BB/9", "K/BB", "pWAR", "LOB%", "ERA-", "FIP-", "kwERA"]
 
 bat_cols = [c for c in BAT_COLS if c in bat.columns]
 pit_cols = [c for c in PIT_COLS if c in pit.columns]
@@ -60,6 +62,18 @@ try:
     _profiles = _db.load_profiles()  # {선수명: {fields...}}
 except Exception:
     _profiles = {}
+
+# 나무위키 등장곡/응원가 병합
+_music_path = data_dir / "namu_music.json"
+if _music_path.exists():
+    import json as _json
+    _music = _json.loads(_music_path.read_text(encoding="utf-8"))
+    for name, mdata in _music.items():
+        if name not in _profiles:
+            continue  # 스탯 데이터 없는 선수는 스킵
+        for field in ("등장곡", "응원가"):
+            if mdata.get(field):
+                _profiles[name][field] = mdata[field]
 
 profiles_json = json.dumps(_profiles, ensure_ascii=False)
 
@@ -170,6 +184,13 @@ html = f"""<!DOCTYPE html>
   }}
   .stat-box-val {{ font-size:1.2rem; font-weight:800; color:#003580; }}
   .stat-box-lbl {{ font-size:0.68rem; color:#888; font-weight:600; margin-top:2px; }}
+  .music-item {{
+    display:flex; flex-direction:column; gap:4px; padding:12px 0;
+    border-bottom:1px solid #f0f0f0;
+  }}
+  .music-item:last-child {{ border-bottom:none; }}
+  .music-label {{ font-size:0.72rem; color:#888; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }}
+  .music-value {{ font-size:0.95rem; font-weight:600; color:#212529; line-height:1.4; }}
   @media (max-width:600px) {{
     .info-grid {{ grid-template-columns:repeat(2,1fr); }}
     .info-item.span2 {{ grid-column:span 2; }}
@@ -177,6 +198,14 @@ html = f"""<!DOCTYPE html>
     .player-hero-name {{ font-size:1.4rem; }}
     .player-hero-photo {{ width:72px; height:88px; }}
   }}
+  /* 퍼센타일 바 */
+  .pct-bar-wrap  {{ margin:6px 0; display:flex; align-items:center; gap:8px; }}
+  .pct-bar-label {{ font-size:0.72rem; color:#888; font-weight:700; width:52px; flex-shrink:0; text-align:right; }}
+  .pct-bar-track {{ flex:1; height:8px; background:#e9ecef; border-radius:4px; position:relative; }}
+  .pct-bar-fill  {{ height:100%; border-radius:4px; transition:width .4s; }}
+  .pct-bar-val   {{ font-size:0.75rem; color:#555; width:36px; text-align:right; flex-shrink:0; }}
+  .pct-bar-mid   {{ position:absolute; top:-3px; left:50%; width:2px; height:14px;
+                    background:#adb5bd; border-radius:1px; transform:translateX(-50%); }}
 </style>
 </head>
 <body>
@@ -201,9 +230,16 @@ html = f"""<!DOCTYPE html>
       <div id="pageInfoGrid" class="info-grid"></div>
     </div>
   </div>
+  <div id="pageMusicSection" class="stats-section">
+    <div id="pageMusic"></div>
+  </div>
   <div class="stats-section">
     <h6>시즌 기록</h6>
     <div id="pageStats" class="stats-grid"></div>
+  </div>
+  <div id="pagePctSection" class="stats-section" style="margin-top:16px">
+    <h6>퍼센타일 (리그 내 순위)</h6>
+    <div id="pagePctBars"></div>
   </div>
 </div>
 
@@ -310,6 +346,25 @@ const BAT_SABER = {json.dumps(BAT_SABER, ensure_ascii=False)};
 const PIT_SABER = {json.dumps(PIT_SABER, ensure_ascii=False)};
 const PROFILES  = {profiles_json};
 
+// ── 퍼센타일 유틸 ────────────────────────────────────────
+
+function calcPct(val, allVals, higherIsBetter) {{
+  if (val == null) return 50;
+  const sorted = allVals.filter(v => v != null && isFinite(v)).sort((a,b)=>a-b);
+  if (!sorted.length) return 50;
+  const rank = sorted.filter(v => v <= val).length;
+  const pct = Math.round(rank / sorted.length * 100);
+  return higherIsBetter ? pct : 100 - pct;
+}}
+
+function pctColor(p) {{
+  if (p >= 80) return '#1a6bc4';
+  if (p >= 60) return '#5baee8';
+  if (p >= 40) return '#adb5bd';
+  if (p >= 20) return '#f9a8a8';
+  return '#dc3545';
+}}
+
 // ── 공통 ────────────────────────────────────────────────
 
 function teamBadge(t) {{
@@ -375,6 +430,14 @@ function openPage(name) {{
     grid.innerHTML = '<p class="text-muted small">프로필 정보가 없습니다.</p>';
   }}
 
+  // 등장곡 / 응원가 (항상 표시)
+  const musicEl = document.getElementById('pageMusic');
+  const musicFields = [['등장곡','등장곡'], ['응원가','응원가']];
+  musicEl.innerHTML = musicFields.map(([k,lbl])=>`<div class="music-item">
+      <span class="music-label">${{lbl}}</span>
+      <span class="music-value">${{(p && p[k]) || '-'}}</span>
+    </div>`).join('');
+
   // 시즌 스탯
   const allStats = [...BAT_DATA, ...PIT_DATA].filter(r=>r['선수명']===name);
   const BAT_SHOW = ['시즌','팀','AVG','HR','RBI','OBP','SLG','OPS','wRC+','bWAR'];
@@ -392,6 +455,51 @@ function openPage(name) {{
     ).join('');
   }} else {{
     statsEl.innerHTML = '<p class="text-muted small">스탯 데이터 없음</p>';
+  }}
+
+  // 퍼센타일 바
+  const pctEl = document.getElementById('pagePctBars');
+  const pctSection = document.getElementById('pagePctSection');
+  if (latest) {{
+    const latestSeason = latest['시즌'];
+    const pool = (isBat ? BAT_DATA : PIT_DATA).filter(r =>
+      r['시즌'] === latestSeason &&
+      (isBat ? (r['PA'] || 0) >= 20 : (r['IP_float'] || 0) >= 5)
+    );
+    const BAT_PCT_METRICS = [
+      {{'key':'wRC+',  'label':'wRC+',  'hib':true}},
+      {{'key':'BABIP', 'label':'BABIP', 'hib':true}},
+      {{'key':'ISO',   'label':'ISO',   'hib':true}},
+      {{'key':'BB%',   'label':'BB%',   'hib':true}},
+      {{'key':'K%',    'label':'K%',    'hib':false}},
+      {{'key':'bWAR',  'label':'bWAR',  'hib':true}},
+    ];
+    const PIT_PCT_METRICS = [
+      {{'key':'FIP',   'label':'FIP',   'hib':false}},
+      {{'key':'ERA',   'label':'ERA',   'hib':false}},
+      {{'key':'K/9',   'label':'K/9',   'hib':true}},
+      {{'key':'BB/9',  'label':'BB/9',  'hib':false}},
+      {{'key':'pWAR',  'label':'pWAR',  'hib':true}},
+    ];
+    const metrics = isBat ? BAT_PCT_METRICS : PIT_PCT_METRICS;
+    pctEl.innerHTML = metrics.map(m => {{
+      const val = latest[m.key];
+      if (val == null) return '';
+      const allVals = pool.map(r => r[m.key]);
+      const pct = calcPct(val, allVals, m.hib);
+      const color = pctColor(pct);
+      return `<div class="pct-bar-wrap">
+        <span class="pct-bar-label">${{m.label}}</span>
+        <div class="pct-bar-track">
+          <div class="pct-bar-fill" style="width:${{pct}}%;background:${{color}}"></div>
+          <div class="pct-bar-mid"></div>
+        </div>
+        <span class="pct-bar-val">${{pct}}%</span>
+      </div>`;
+    }}).join('');
+    pctSection.style.display = '';
+  }} else {{
+    pctSection.style.display = 'none';
   }}
 
   document.getElementById('playerPage').style.display = 'block';
@@ -802,9 +910,10 @@ function applyFilters() {{
   renderTeamCharts(bd, pd);
 }}
 
-// 시즌 변경 시 PA/IP 기본값 조정
+// 시즌 변경 시 PA/IP 기본값 조정 + localStorage 저장
 seasonSel.addEventListener('change', ()=>{{
   const s = seasonSel.value;
+  localStorage.setItem('kbo_season', s);
   const pa = document.getElementById('paFilter');
   const ip = document.getElementById('ipFilter');
   if (s==='2026') {{
@@ -816,7 +925,10 @@ seasonSel.addEventListener('change', ()=>{{
   }}
   applyFilters();
 }});
-teamSel.addEventListener('change', applyFilters);
+teamSel.addEventListener('change', ()=>{{
+  localStorage.setItem('kbo_team', teamSel.value);
+  applyFilters();
+}});
 document.getElementById('paFilter').addEventListener('input', function(){{
   document.getElementById('paVal').textContent=this.value; applyFilters();
 }});
@@ -824,8 +936,13 @@ document.getElementById('ipFilter').addEventListener('input', function(){{
   document.getElementById('ipVal').textContent=this.value; applyFilters();
 }});
 
-// 최초 렌더 — 최신 연도에 맞게 PA/IP 초기값 조정
+// 최초 렌더 — localStorage 시즌/팀 복원 + PA/IP 초기값 조정
 (()=>{{
+  const savedSeason = localStorage.getItem('kbo_season');
+  const savedTeam   = localStorage.getItem('kbo_team');
+  if (savedSeason && SEASONS.includes(savedSeason)) seasonSel.value = savedSeason;
+  if (savedTeam   && TEAMS.includes(savedTeam))     teamSel.value   = savedTeam;
+
   const s = seasonSel.value;
   const pa = document.getElementById('paFilter');
   const ip = document.getElementById('ipFilter');
